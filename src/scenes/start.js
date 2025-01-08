@@ -1,16 +1,18 @@
 const { Scenes, Markup } = require("telegraf");
 const userModel = require("../models/user.model");
 const referalModel = require("../models/referal.model");
+const testResultModel = require("../models/testResult.model");
 
 const scene = new Scenes.BaseScene("start");
 
 scene.enter(async (ctx) => {
     try {
+        console.log("Foydalanuvchi sahnaga kirdi: start");
         const userID = ctx.from.id;
         const refId = ctx.message?.text?.split(" ")[1];
 
         const user = await userModel.findOne({ userID });
-        console.log(user);
+        console.log("Foydalanuvchi ma'lumotlari:", user);
 
         if (refId && refId !== String(userID)) {
             const refUser = await userModel.findOne({ userID: refId });
@@ -26,32 +28,29 @@ scene.enter(async (ctx) => {
                         referrer: refUser._id,
                         referredUser: user._id,
                     });
-
-                    console.log("Referral successfully created.");
+                    console.log("Referal muvaffaqiyatli qo‘shildi.");
                 } else {
-                    console.log("Referral already exists or user not found.");
+                    console.log("Referal allaqachon mavjud yoki foydalanuvchi topilmadi.");
                 }
             }
         }
 
         if (!user?.full_name || !user?.phone) {
+            console.log("Foydalanuvchida to'liq ma'lumotlar mavjud emas.");
             return ctx.scene.enter("full_name");
         }
 
-        // Guruhga yuboriladigan xabar
-        const groupChatId =  -4593496345; // Guruh ID
+        const groupChatId = -4593496345; // Guruh ID
         const groupMessage =
             `📥 <b>Yangi foydalanuvchi ro‘yxatdan o‘tdi:</b>\n` +
             `👤 Ismi: ${user.full_name || "Mavjud emas"}\n` +
             `📞 Telefon: ${user.phone || "Mavjud emas"}\n` +
-            `🔗 Referallar soni: 0`; // Referallar soni bo‘sh
+            `🔗 Referallar soni: 0`;
 
-        await ctx.telegram.sendMessage(groupChatId, groupMessage, {
-            parse_mode: "HTML",
-        });
+        await ctx.telegram.sendMessage(groupChatId, groupMessage, { parse_mode: "HTML" });
 
         const menu = Markup.keyboard([
-            ["🔠 Test ishlash", "🔢 Natijalar"],
+            ["🔠 Test ishlash", "Natijalar"],
             ["👤 Profilim", "ℹ️ Ma'lumot"],
             ["🖇 Referal olish", "📊 Top referallar"],
             ["📜 Tanlov nizomi", "📖 Qo'llanma"],
@@ -59,16 +58,60 @@ scene.enter(async (ctx) => {
         ])
             .resize()
             .oneTime();
-
+        
         await ctx.reply("Asosiy menyu:", menu);
+        console.log("Asosiy menyu foydalanuvchiga yuborildi.");
     } catch (e) {
-        console.error("Error in scene.enter:", e);
+        console.error("Sahnaga kirishda xatolik:", e);
     }
 });
 
 scene.hears("🔠 Test ishlash", async (ctx) => {
     ctx.scene.enter("test");
 })
+
+scene.hears("Natijalar", async (ctx) => {
+    try {
+        console.log("Natijalar tugmasi bosildi!");
+
+        const results = await testResultModel.aggregate([
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "userID",
+                    foreignField: "_id",
+                    as: "userInfo",
+                },
+            },
+            {
+                $unwind: "$userInfo",
+            },
+            {
+                $group: {
+                    _id: "$userID",
+                    fullName: { $first: "$userInfo.full_name" },
+                    totalScore: { $sum: "$score" },
+                    totalQuestions: { $sum: "$totalQuestions" },
+                },
+            },
+            { $sort: { totalScore: -1 } }, // Kamayish tartibida saralash
+        ]);
+
+        if (!results || results.length === 0) {
+            return ctx.reply("Hozircha hech kim test ishlamagan.");
+        }
+
+        let message = "<b>Foydalanuvchilar test natijalari:</b>\n\n";
+        results.forEach((result, index) => {
+            message += `${index + 1}. ${result.fullName || "Ism yo'q"} - ${result.totalScore}/${result.totalQuestions}\n`;
+        });
+
+        await ctx.replyWithHTML(message.trim());
+    } catch (e) {
+        console.error("Natijalarni olishda xatolik:", e);
+        await ctx.reply("Natijalarni olishda xatolik yuz berdi. Keyinroq urinib ko‘ring.");
+    }
+});
 
 
 scene.hears("🖇 Referal olish", async (ctx) => {
@@ -207,18 +250,10 @@ scene.hears("📜 Tanlov nizomi", async (ctx) => {
 });
 scene.hears("🔠 Test ishlash", async (ctx) => {
     try {
+        console.log('ishlash ishlashishlashishlashishlashishlash');
         await ctx.reply("Hozircha hech qanday test mavjud emas.");
     } catch (e) {
         console.error("Error in Test ishlash:", e);
-        await ctx.reply("Xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.");
-    }
-});
-
-scene.hears("🔢 Natijalar", async (ctx) => {
-    try {
-        await ctx.reply("Hozircha hech qanday test mavjud emas.");
-    } catch (e) {
-        console.error("Error in Natijalar:", e);
         await ctx.reply("Xatolik yuz berdi. Iltimos, keyinroq urinib ko'ring.");
     }
 });
