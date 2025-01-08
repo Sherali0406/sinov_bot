@@ -7,12 +7,10 @@ const scene = new Scenes.BaseScene("start");
 
 scene.enter(async (ctx) => {
     try {
-        console.log("Foydalanuvchi sahnaga kirdi: start");
         const userID = ctx.from.id;
         const refId = ctx.message?.text?.split(" ")[1];
 
         const user = await userModel.findOne({ userID });
-        console.log("Foydalanuvchi ma'lumotlari:", user);
 
         if (refId && refId !== String(userID)) {
             const refUser = await userModel.findOne({ userID: refId });
@@ -40,7 +38,7 @@ scene.enter(async (ctx) => {
             return ctx.scene.enter("full_name");
         }
 
-        const groupChatId = -4593496345; // Guruh ID
+        const groupChatId = -1002446123573; // Guruh ID
         const groupMessage =
             `📥 <b>Yangi foydalanuvchi ro‘yxatdan o‘tdi:</b>\n` +
             `👤 Ismi: ${user.full_name || "Mavjud emas"}\n` +
@@ -54,13 +52,12 @@ scene.enter(async (ctx) => {
             ["👤 Profilim", "ℹ️ Ma'lumot"],
             ["🖇 Referal olish", "📊 Top referallar"],
             ["📜 Tanlov nizomi", "📖 Qo'llanma"],
-            ["📚 Kitoblar"],
+            ["📚 Kitoblar","👉Ishtirok etish👈"],
         ])
             .resize()
             .oneTime();
         
         await ctx.reply("Asosiy menyu:", menu);
-        console.log("Asosiy menyu foydalanuvchiga yuborildi.");
     } catch (e) {
         console.error("Sahnaga kirishda xatolik:", e);
     }
@@ -72,7 +69,6 @@ scene.hears("🔠 Test ishlash", async (ctx) => {
 
 scene.hears("Natijalar", async (ctx) => {
     try {
-        console.log("Natijalar tugmasi bosildi!");
 
         const results = await testResultModel.aggregate([
             {
@@ -203,7 +199,7 @@ scene.hears("📊 Top referallar", async (ctx) => {
 
 scene.hears("👤 Profilim", async (ctx) => {
     try {
-        const groupChatId =  -4593496345;
+        const groupChatId =  -1002446123573;
         const user = await userModel.findOne({ userID: ctx.from.id });
         const referrals = await referalModel.find({ referrer: user?._id });
         const referralCount = referrals.length;

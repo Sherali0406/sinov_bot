@@ -10,7 +10,7 @@ require("./models/db")
 bot.use(session)
 bot.use(stage.middleware())
 bot.use(auth)
-// bot.use(require("./middleware/obuna"))
+bot.use(require("./middleware/obuna"))
 
 bot.start((ctx) => {
     if (ctx.chat.type === "private") {

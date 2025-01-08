@@ -238,7 +238,6 @@ const testQuestions = [
 
 scene.enter(async (ctx) => {
     try {
-        console.log("Foydalanuvchi sahnaga kirdi: test");
         const user = await userModel.findOne({ userID: ctx.from.id });
 
         if (!user) {
