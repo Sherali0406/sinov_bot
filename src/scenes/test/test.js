@@ -1,90 +1,112 @@
-const { Scenes, Markup } = require("telegraf")
-const userModel = require("../../models/user.model")
+const { Scenes, Markup } = require("telegraf");
+const userModel = require("../../models/user.model");
 
-const scene = new Scenes.BaseScene("test")
+const scene = new Scenes.BaseScene("test");
 
-// Static test questions and answers
+// Savollarni aniqlash
 const testQuestions = [
     {
-        question: "1. 2 + 2 nechiga teng?",
-        options: ["3", "4", "5"],
-        correctAnswer: "4",
+        question:
+            "<b>Savol:</b> Panipat jangida Ibrohim Lo'dining 100 ming kishilik qo‘shiniga qarshi Boburning necha kishilik qo‘shini qatnashgan?\n\n<b>A)</b> 12000\n<b>B)</b> 20000\n<b>C)</b> 70 000\n<b>D)</b> 50000",
+        options: ["A", "B", "C", "D"],
+        correctAnswer: "B",
     },
     {
-        question: "2. Toshkent O'zbekistonning qaysi qismida joylashgan?",
-        options: ["g'arb", "sharq", "janub"],
-        correctAnswer: "sharq",
+        question:
+            "<b>Savol:</b> Toshkent O'zbekistonning qaysi qismida joylashgan?\n\n<b>A)</b> g'arb\n<b>B)</b> sharq\n<b>C)</b> janub\n<b>D)</b> markaz",
+        options: ["A", "B", "C", "D"],
+        correctAnswer: "B",
     },
-    {
-        question: "3. Yerning sun'iy yo'ldoshi nima?",
-        options: ["oy", "quyosh", "mars"],
-        correctAnswer: "oy",
-    },
-]
+];
 
-// State to keep track of user progress in test questions
+// Testni boshlash
 scene.enter(async (ctx) => {
-    ctx.session.testIndex = 0 // Start from the first question
-    ctx.session.correctCount = 0 // Track correct answers
-    ctx.session.userAnswers = [] // Track user answers
+    ctx.session.testIndex = 0; // Birinchi savoldan boshlash
+    ctx.session.correctCount = 0; // To'g'ri javoblar soni
+    ctx.session.userAnswers = []; // Foydalanuvchi javoblari
 
-    const currentQuestion = testQuestions[ctx.session.testIndex]
-
-    await ctx.reply(
+    const currentQuestion = testQuestions[ctx.session.testIndex];
+    await ctx.replyWithHTML(
         currentQuestion.question,
         Markup.inlineKeyboard(
-            currentQuestion.options.map((option) => Markup.button.callback(option, option))
-        )
-    )
-})
-
-scene.action(/.*/, async (ctx) => {
-    const currentQuestion = testQuestions[ctx.session.testIndex]
-    const userAnswer = ctx.match[0]
-
-    // Store the user's answer
-    ctx.session.userAnswers.push({
-        question: currentQuestion.question,
-        selectedAnswer: userAnswer,
-        isCorrect: userAnswer === currentQuestion.correctAnswer,
-    })
-
-    if (userAnswer === currentQuestion.correctAnswer) {
-        ctx.session.correctCount += 1 // Increment correct answer count
-    }
-
-    ctx.session.testIndex += 1 // Move to the next question
-
-    if (ctx.session.testIndex < testQuestions.length) {
-        const nextQuestion = testQuestions[ctx.session.testIndex]
-        await ctx.editMessageText(
-            nextQuestion.question,
-            Markup.inlineKeyboard(
-                nextQuestion.options.map((option) => Markup.button.callback(option, option))
+            currentQuestion.options.map((option) =>
+                Markup.button.callback(option, `answer_${option}`)
             )
         )
-    } else {
-        // Test completed, show results
-        const user = await userModel.findOne({ userID: ctx.from.id }) 
+    );
+});
 
-        const resultMessage = `Test yakunlandi! Siz ${ctx.session.correctCount}/${testQuestions.length} ta savolga to'g'ri javob berdingiz.`
+// Javoblarni qayta ishlash
+scene.action(/^answer_(.*)/, async (ctx) => {
+    try {
+        const userAnswer = ctx.match[1]; // Foydalanuvchi javobi
+        const currentQuestion = testQuestions[ctx.session.testIndex];
 
-        if (user) {
-            const summary =
-                `Ism: ${user.full_name}\nNatija: ${ctx.session.correctCount}/${testQuestions.length}\n\nSavollar va javoblar:\n` +
-                ctx.session.userAnswers
-                    .map((answer, index) => {
-                        return `${index + 1}. ${answer.question}\nSizning javobingiz: ${
-                            answer.selectedAnswer
-                        }\nTo'g'ri javob: ${testQuestions[index].correctAnswer}\n`
-                    })
-                    .join("\n")
+        // Foydalanuvchi javoblarini saqlash
+        ctx.session.userAnswers.push({
+            question: currentQuestion.question,
+            selectedAnswer: userAnswer,
+            isCorrect: userAnswer === currentQuestion.correctAnswer,
+        });
 
-            await ctx.telegram.sendMessage("-1002446123573", summary) // Replace with your channel ID
+        // To'g'ri javoblarni hisoblash
+        if (userAnswer === currentQuestion.correctAnswer) {
+            ctx.session.correctCount += 1;
         }
 
-        await ctx.editMessageText(resultMessage)
-    }
-})
+        // Keyingi savolga o'tish
+        ctx.session.testIndex += 1;
 
-module.exports = scene
+        if (ctx.session.testIndex < testQuestions.length) {
+            const nextQuestion = testQuestions[ctx.session.testIndex];
+
+            // Savolni yangilash
+            await ctx.editMessageText(
+                nextQuestion.question, // HTML formatda savol
+                {
+                    parse_mode: "HTML",
+                    reply_markup: {
+                        inline_keyboard: [
+                            nextQuestion.options.map((option) => ({
+                                text: option,
+                                callback_data: `answer_${option}`,
+                            })),
+                        ],
+                    },
+                }
+            );
+        } else {
+            // Test tugadi
+            const resultMessage = `<b>Test yakunlandi!</b>\nSiz ${ctx.session.correctCount}/${testQuestions.length} ta savolga to'g'ri javob berdingiz.`;
+
+            await ctx.editMessageText(resultMessage, { parse_mode: "HTML" });
+
+            // Natijalarni kanalda chiqarish (agar kerak bo'lsa)
+            const user = await userModel.findOne({ userID: ctx.from.id });
+            if (user) {
+                const summary =
+                    `<b>Ism:</b> ${user.full_name}\n<b>Natija:</b> ${ctx.session.correctCount}/${testQuestions.length}\n\n<b>Savollar va javoblar:</b>\n` +
+                    ctx.session.userAnswers
+                        .map((answer, index) => {
+                            return `<b>${index + 1}.</b> ${
+                                answer.question
+                            }\n<b>Sizning javobingiz:</b> ${
+                                answer.selectedAnswer
+                            }\n<b>To'g'ri javob:</b> ${
+                                testQuestions[index].correctAnswer
+                            }\n`;
+                        })
+                        .join("\n");
+
+                await ctx.telegram.sendMessage("-4593496345", summary, {
+                    parse_mode: "HTML",
+                });
+            }
+        }
+    } catch (error) {
+        console.error("Xato yuz berdi:", error);
+        await ctx.replyWithHTML("Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.");
+    }
+});;
+
+module.exports = scene;

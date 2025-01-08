@@ -39,7 +39,7 @@ scene.enter(async (ctx) => {
         }
 
         // Guruhga yuboriladigan xabar
-        const groupChatId =  -1002446123573; // Guruh ID
+        const groupChatId =  -4593496345; // Guruh ID
         const groupMessage =
             `📥 <b>Yangi foydalanuvchi ro‘yxatdan o‘tdi:</b>\n` +
             `👤 Ismi: ${user.full_name || "Mavjud emas"}\n` +
@@ -160,7 +160,7 @@ scene.hears("📊 Top referallar", async (ctx) => {
 
 scene.hears("👤 Profilim", async (ctx) => {
     try {
-        const groupChatId =  -1002446123573;
+        const groupChatId =  -4593496345;
         const user = await userModel.findOne({ userID: ctx.from.id });
         const referrals = await referalModel.find({ referrer: user?._id });
         const referralCount = referrals.length;
